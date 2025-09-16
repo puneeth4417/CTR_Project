@@ -4,5 +4,3 @@ xgboost
 scikit-learn
 matplotlib
 joblib
-sys
-os
