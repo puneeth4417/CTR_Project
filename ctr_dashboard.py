@@ -1,5 +1,5 @@
 # ==========================================================
-# 📊 CTR Prediction Dashboard (Final Decoded Dropdown Version)
+# CTR Prediction Dashboard 
 # ==========================================================
 import streamlit as st
 import pandas as pd
@@ -13,14 +13,14 @@ import pickle, os, warnings
 warnings.filterwarnings("ignore")
 
 # ----------------------------------------------------------
-# 🧱 Page Setup
+# Page Setup
 # ----------------------------------------------------------
 st.set_page_config(page_title="CTR Prediction Dashboard", layout="wide")
 st.title("📈 CTR Prediction Model Comparison Dashboard")
 st.markdown("Visualize model performance and make CTR predictions with pre-trained models.")
 
 # ----------------------------------------------------------
-# 📦 Load Models
+# Load Models
 # ----------------------------------------------------------
 model_dir = "saved_models"
 
@@ -44,7 +44,7 @@ else:
     st.sidebar.write(list(models.keys()))
 
 # ----------------------------------------------------------
-# 📊 Load Supporting Files
+# Load Supporting Files
 # ----------------------------------------------------------
 perf_file = os.path.join(model_dir, "model_performance.csv")
 roc_file = os.path.join(model_dir, "roc_data.npz")
@@ -61,7 +61,7 @@ if os.path.exists(encoder_file):
     # st.sidebar.info("")
 
 # ----------------------------------------------------------
-# ⚡ Model Performance
+# Model Performance
 # ----------------------------------------------------------
 if os.path.exists(perf_file):
     st.subheader("⚡ Model Performance (K-Fold Cross Validation)")
@@ -69,7 +69,7 @@ if os.path.exists(perf_file):
     st.dataframe(perf_df.style.highlight_max(axis=0, color="lightgreen"))
 
 # ----------------------------------------------------------
-# 📈 ROC–AUC Curves
+# ROC–AUC Curves
 # ----------------------------------------------------------
 if os.path.exists(roc_file):
     st.subheader("📈 ROC–AUC Curve Comparison (From Training)")
@@ -87,7 +87,7 @@ if os.path.exists(roc_file):
     st.pyplot(plt)
 
 # ----------------------------------------------------------
-# 📉 Precision–Recall Curves
+# Precision–Recall Curves
 # ----------------------------------------------------------
 if os.path.exists(pr_file):
     st.subheader("📉 Precision–Recall Curves (From Training)")
@@ -104,7 +104,7 @@ if os.path.exists(pr_file):
     st.pyplot(plt)
 
 # ----------------------------------------------------------
-# 🧩 Confusion Matrices + Precision & Recall
+# Confusion Matrices + Precision & Recall
 # ----------------------------------------------------------
 if os.path.exists(cm_file):
     st.subheader("🧩 Confusion Matrices with Precision & Recall")
@@ -126,7 +126,7 @@ if os.path.exists(cm_file):
         idx += 1
 
 # ----------------------------------------------------------
-# 🏆 Feature Importance Viewer (Filtered)
+# Feature Importance Viewer (Filtered)
 # ----------------------------------------------------------
 st.subheader("🏆 Feature Importance Viewer")
 valid_model_names = [name for name in models.keys() if "data" not in name.lower() and "confusion" not in name.lower()]
@@ -157,7 +157,7 @@ if selected_model_name:
         st.warning(f"{selected_model_name} does not support feature importance visualization.")
 
 # ----------------------------------------------------------
-# 📂 Upload Dataset for Prediction
+# Upload Dataset for Prediction
 # ----------------------------------------------------------
 st.sidebar.header("📥 Upload Dataset for Predictions")
 uploaded_file = st.sidebar.file_uploader("Upload your preprocessed dataset (CSV)", type=["csv"])
@@ -184,7 +184,7 @@ if uploaded_file:
     X = X[train_features]
 
     # ----------------------------------------------------------
-    # 🎯 CTR Prediction (Decode Encoded Variables)
+    # CTR Prediction (Decode Encoded Variables)
     # ----------------------------------------------------------
     st.subheader("🎯 Predict CTR on Custom Input")
 
