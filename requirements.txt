@@ -9,3 +9,5 @@ lightgbm
 seaborn
 streamlit
 plotly
+tensorflow
+shap

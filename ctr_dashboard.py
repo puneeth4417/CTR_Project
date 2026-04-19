@@ -1,6 +1,8 @@
 # ==========================================================
 # CTR Prediction Dashboard 
 # ==========================================================
+from os import path
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -25,15 +27,20 @@ st.markdown("Visualize model performance and make CTR predictions with pre-train
 model_dir = "saved_models"
 
 def load_models():
+    VALID_MODELS = [
+    "xgboost.pkl",
+    "lightgbm.pkl",
+    "random_forest.pkl",
+    "adaboost.pkl"
+    ]
+
     models = {}
     if not os.path.exists(model_dir):
         st.error("❌ 'saved_models' directory not found. Please run ctr_prediction.ipynb first.")
         return models
-    for filename in os.listdir(model_dir):
-        if filename.endswith(".pkl") and "confusion" not in filename.lower() and "data" not in filename.lower() and "encoder" not in filename.lower():
-            model_name = filename.replace(".pkl", "")
-            with open(os.path.join(model_dir, filename), "rb") as file:
-                models[model_name] = pickle.load(file)
+    for filename in VALID_MODELS:
+        with open(os.path.join(model_dir, filename), "rb") as f:
+            models[filename.replace(".pkl", "")] = pickle.load(f)
     return models
 
 models = load_models()
@@ -238,3 +245,184 @@ if uploaded_file:
             st.info(f"🧩 **Final Predicted Class:** {final_class}")
 else:
     st.info("👈 Upload a dataset to make predictions.")
+    
+# ==========================================================
+# 🔍 Real-Time SHAP Explanation (XGBoost)
+# ==========================================================
+st.markdown("---")
+st.subheader("🔍 Explain Prediction (Real-Time SHAP)")
+
+import shap
+
+shap_explainer_file = "saved_models/shap_explainer.pkl"
+
+if os.path.exists(shap_explainer_file):
+
+    # Load SHAP explainer only once
+    @st.cache_resource
+    def load_shap():
+        with open(shap_explainer_file, "rb") as f:
+            return pickle.load(f)
+
+    explainer = load_shap()
+
+    # Only run explanation if prediction happened
+    if "input_df" in locals():
+
+        try:
+
+            # Compute SHAP values
+            shap_values = explainer.shap_values(input_df)
+
+            st.write("### Feature Contribution to CTR Prediction")
+
+            fig = plt.figure()
+
+            shap.plots._waterfall.waterfall_legacy(
+                explainer.expected_value,
+                shap_values[0],
+                feature_names=input_df.columns
+            )
+
+            st.pyplot(fig)
+
+            st.info("""
+            Interpretation Guide:
+            
+            🔹 Positive values → increase click probability  
+            🔹 Negative values → decrease click probability  
+            🔹 Larger bars → stronger influence
+            """)
+
+        except Exception as e:
+            st.warning(f"SHAP explanation failed: {e}")
+
+    else:
+        st.info("Run a prediction first to generate explanation.")
+
+else:
+    st.warning("SHAP explainer not found. Run ctr_prediction.ipynb.")
+# ==========================================================
+# 🔍 Explainable AI (SHAP)
+# ==========================================================
+st.markdown("---")
+st.subheader("🔍 Explainable AI — Feature Contribution (SHAP)")
+import shap
+shap_file = "saved_models/shap_results.npy"
+# ----------------------------------------------------------
+# Cache SHAP loading to improve dashboard performance
+# ----------------------------------------------------------
+
+@st.cache_data
+def load_shap_data(path):
+    return np.load(path, allow_pickle=True).item()
+
+if os.path.exists(shap_file):
+    try:
+        shap_data = load_shap_data(shap_file)
+
+        # ----------------------------------------------------------
+        # Ensure only valid models appear
+        # ----------------------------------------------------------
+        model_names = list(shap_data.keys())
+
+        if len(model_names) == 0:
+            st.warning("No valid models found in SHAP results.")
+        else:
+
+            # ----------------------------------------------------------
+            # Model selector
+            # ----------------------------------------------------------
+            selected_model = st.selectbox(
+                "Select model for explanation",
+                model_names
+            )
+
+            data = shap_data[selected_model]
+
+            shap_values = data["values"]
+            features = pd.DataFrame(
+                data["features"],
+                columns=data["columns"]
+            )
+
+            # ----------------------------------------------------------
+            # Global Feature Importance (SHAP Summary Plot)
+            # ----------------------------------------------------------
+            st.write("### 🌍 Global Feature Importance")
+
+            fig = plt.figure()
+            shap.summary_plot(
+                shap_values,
+                features,
+                show=False
+            )
+            st.pyplot(fig)
+
+            # ----------------------------------------------------------
+            # Top Feature Importance Table
+            # ----------------------------------------------------------
+            st.write("### ⭐ Top Influential Features")
+
+            importance = np.abs(shap_values).mean(axis=0)
+
+            importance_df = pd.DataFrame({
+                "Feature": features.columns,
+                "Importance": importance
+            }).sort_values("Importance", ascending=False)
+
+            st.dataframe(
+                importance_df.head(10),
+                use_container_width=True
+            )
+            
+            st.info(
+                """
+                Interpretation Guide:
+                
+                🔹 Red points → Higher feature values  
+                🔹 Blue points → Lower feature values  
+                🔹 Vertical spread → Interaction with other features  
+                🔹 Higher SHAP value → Increases predicted CTR
+                """
+            )
+
+    except Exception as e:
+        st.error(f"Error loading SHAP explanations: {e}")
+else:
+    st.warning("SHAP results not found. Run ctr_prediction.ipynb to generate them.")
+# ==========================================================
+# 📌 Model Validation on Test Data
+# ==========================================================
+st.markdown("---")
+st.subheader("📊 Model Validation on Unseen Test Data")
+
+# Load test predictions generated in ctr_prediction.ipynb
+try:
+    test_df = pd.read_csv("saved_models/test_predictions.csv")
+
+    st.markdown("### 🔍 Actual vs Predicted Results (Test Set)")
+    if st.button("🔄 Show New Random Samples"):
+        st.dataframe(test_df.sample(min(20, len(test_df))))
+    else:
+        st.dataframe(test_df.sample(min(20, len(test_df))))
+
+    # ------------------------------------------------------
+    # Actual vs Predicted Probability Plot
+    # ------------------------------------------------------
+    st.markdown("### 📈 Actual vs Predicted Probability")
+
+    fig_prob = px.scatter(
+        test_df,
+        y="Predicted_Probability",
+        color=test_df["Actual_Click"].astype(str),
+        labels={"color": "Actual Click"},
+        title="Actual vs Predicted Probability (Test Set)"
+    )
+    st.plotly_chart(fig_prob, use_container_width=True)
+
+except FileNotFoundError:
+    st.warning(
+        "Test validation data not found. "
+        "Please run ctr_prediction.ipynb to generate test_predictions.csv"
+    )
